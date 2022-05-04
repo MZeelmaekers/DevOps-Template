@@ -13,8 +13,8 @@ variables:
   imageRepo: kboservice
   tag: '$(Build.BuildId)'
   acrsecret: k8sexamplesacrauth
-  acrdevurl: 'acrcmnint.azurecr.io'
-  imageurl: 'acrcmnint.azurecr.io/kboservice'
+  acrdevurl: 'ACR Link'
+  imageurl: 'Full ACR Link'
   replicacount: 1
   reponaam: '$(Build.Repository.Name)'
 
@@ -30,7 +30,7 @@ stages:
     - task: Docker@2
       displayName: Build an image
       inputs:
-        containerRegistry: 'scn-acr-int'
+        containerRegistry: 'Service Prinicipal'
         repository: '$(imageRepo)'
         command: 'buildAndPush'
         Dockerfile: '**/Dockerfile'
