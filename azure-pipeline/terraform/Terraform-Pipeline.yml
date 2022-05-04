@@ -1,0 +1,58 @@
+resources:
+  repositories:
+  - repository: kboservice
+    name: sandbox/kboservice
+    type: git
+
+#Variables used in the Pipeline.
+#Group are Azure Vault Variables
+#SP is the service prinipal connection.
+variables:
+  - group: LIB-kv-pa-devops-int
+  - name: SP-Con
+    value: SC-INT
+  - name: workdir
+    value: $(System.DefaultWorkingDirectory)/terraform/
+
+stages:
+- stage: Security_Testing
+  displayName: TF-Security
+  jobs:
+#Run template met security checks.
+  - template: Terraform-Security.yml 
+
+#Run template met validation checks.
+- stage: Auto_Valication  
+  displayName: TF-Validation
+  jobs:
+  - template: Terraform-Validate.yml
+    parameters:
+      WD: $(workdir)
+      ServPrin: $(SP-Con)
+      DependsOn: Terraform_Security_Scan
+
+#Manuele verificatie
+- stage: Manual_Validation
+  displayName: TF-Manual-Validation
+  jobs:
+  - job: WaitonValidation
+    #dependsOn: Terraform_Validate
+    displayName: Verification
+    pool: server
+    timeoutInMinutes: 4320
+    steps:
+      - task: ManualValidation@0
+        inputs:
+          notifyUsers: 'maxim.zeelmaekers@rkitek.be'
+          instructions: 'Check security scan & terraform plan file.'
+
+- stage: Deployment
+  displayName: TF-Deployment
+  jobs:
+#Run template met deployment code 
+  - template: Terraform-Deploy.yml
+    parameters:
+      WD: $(workdir)
+      ServPrin: $(SP-Con)
+      DependsOn: WaitonValidation
+

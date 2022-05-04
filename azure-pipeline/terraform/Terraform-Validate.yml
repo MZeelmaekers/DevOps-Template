@@ -1,0 +1,37 @@
+jobs:
+  - job: Terraform_Validate
+    displayName: Auto Validate
+    #dependsOn: ${{ parameters.DependsOn }}
+    continueOnError: false
+    steps:
+    - checkout: self
+    - task: TerraformInstaller@0
+      displayName: Terraform - Install
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTaskV2@2
+      displayName: Terraform - Init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: ${{parameters.WD}}
+        backendServiceArm: ${{parameters.ServPrin}}
+        backendAzureRmResourceGroupName: $(resourcegroup)
+        backendAzureRmStorageAccountName: $(storageAccountName)
+        backendAzureRmContainerName: $(storageContainerName)
+        backendAzureRmKey: $(storagekey-kboservice)
+
+    - task: TerraformTaskV2@2
+      displayName: Terraform - Validate
+      inputs:
+        provider: 'azurerm'
+        workingDirectory: ${{parameters.WD}}
+        command: 'validate'
+
+    - task: TerraformTaskV2@2
+      displayName: Terraform - Plan
+      inputs:
+        provider: 'azurerm'
+        workingDirectory: ${{parameters.WD}}
+        command: 'plan'
+        environmentServiceNameAzureRM: ${{parameters.ServPrin}}

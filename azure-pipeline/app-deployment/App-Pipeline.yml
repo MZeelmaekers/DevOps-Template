@@ -1,0 +1,93 @@
+trigger: none
+
+# this pipeline will be triggered by another pipeline
+resources:
+  pipelines:
+  - pipeline: INT-KBO_Service-Infrastructure  # Name of the pipeline resource
+    source: INT-KBO_Service-Infrastructure # Name of the pipeline referenced by the pipeline resource
+    trigger: true # enable the trigger.
+
+
+variables:
+  namespace: default
+  imageRepo: kboservice
+  tag: '$(Build.BuildId)'
+  acrsecret: k8sexamplesacrauth
+  acrdevurl: 'acrcmnint.azurecr.io'
+  imageurl: 'acrcmnint.azurecr.io/kboservice'
+  replicacount: 1
+  reponaam: '$(Build.Repository.Name)'
+
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: Docker@2
+      displayName: Build an image
+      inputs:
+        containerRegistry: 'scn-acr-int'
+        repository: '$(imageRepo)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: '$(tag)'
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Pipeline.Workspace)'
+        artifact: 'manifests'
+        publishLocation: 'pipeline'
+
+- stage: Deploy
+  displayName: Deploy on K8S
+  dependsOn: Build
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy to AKS
+    environment: 'int.default'
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+     runOnce:
+       deploy:
+        steps:
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            buildType: 'current'
+            artifactName: 'manifests'
+            targetPath: '$(Pipeline.Workspace)/manifests'
+        - task: KubernetesManifest@0
+          inputs:
+            action: 'createSecret'
+            namespace: '$(namespace)'
+            secretType: 'dockerRegistry'
+            secretName: '$(acrsecret)'
+            dockerRegistryEndpoint: 'scn-acr-int'
+        - task: replacetokens@5
+          inputs:
+            rootDirectory: '$(Pipeline.Workspace)/manifests/s/kubernetes/'
+            targetFiles: 'deployment.yaml'
+            encoding: 'auto'
+            tokenPattern: 'custom'
+            tokenPrefix: '#'
+            tokenSuffix: '#'
+            writeBOM: true
+            actionOnMissing: 'warn'
+            keepToken: false
+            actionOnNoFiles: 'continue'
+            enableTransforms: false
+            enableRecursion: false
+            useLegacyPattern: false
+            enableTelemetry: true
+        - task: KubernetesManifest@0
+          inputs:
+            action: 'deploy'
+            namespace: '$(namespace)'
+            manifests: |
+              $(Pipeline.Workspace)/manifests/s/kubernetes/deployment.yaml
+              $(Pipeline.Workspace)/manifests/s/kubernetes/ingress.yaml
+              $(Pipeline.Workspace)/manifests/s/kubernetes/service.yaml
+            containers: '$(acrdevurl)/$(imageRepo):$(tag)'

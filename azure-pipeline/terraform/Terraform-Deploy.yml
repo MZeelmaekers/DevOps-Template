@@ -1,0 +1,33 @@
+jobs:
+- deployment: 'Terraform_Deployment'
+  displayName: Deployment
+  #dependsOn: ${{ parameters.DependsOn }}
+  continueOnError: false
+  environment: 'dev'
+  strategy:
+   runOnce:
+      deploy:
+        steps:
+        - checkout: self
+        - task: TerraformInstaller@0
+          displayName: Terraform - Install
+          inputs:
+            terraformVersion: 'latest'
+        - task: TerraformTaskV2@2
+          displayName: Terraform - Init
+          inputs:
+            provider: 'azurerm'
+            workingDirectory: ${{parameters.WD}}
+            command: 'init'
+            backendServiceArm: ${{parameters.ServPrin}}
+            backendAzureRmResourceGroupName: $(resourcegroup)
+            backendAzureRmStorageAccountName: $(storageAccountName)
+            backendAzureRmContainerName: $(storageContainerName)
+            backendAzureRmKey: $(storagekey-kboservice)
+        - task: TerraformTaskV2@2
+          displayName: Terraform - Apply
+          inputs:
+            provider: 'azurerm'
+            workingDirectory: ${{parameters.WD}}
+            command: 'apply'
+            environmentServiceNameAzureRM: ${{parameters.ServPrin}}
